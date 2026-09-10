@@ -64,13 +64,23 @@ export default function Dashboard() {
 
   // ── Search ───────────────────────────────────────────────────────────────
   const handleSearch = useCallback(async (code) => {
-    const landCode = (code || inputCode).trim();
-    if (landCode.length !== 14) return;
+    let raw = (code || inputCode || '').trim().replace(/\D/g, '');
+    if (!raw) {
+      addToast('Please enter a Bhu-Aadhar ID or select a preset below.', 'warning', 3000);
+      return;
+    }
+    let landCode = raw;
+    if (landCode.length < 14) {
+      landCode = landCode.padEnd(14, '0');
+    } else if (landCode.length > 14) {
+      landCode = landCode.slice(0, 14);
+    }
 
     setLoading(true);
     setError('');
     setData(null);
     setActiveCode(landCode);
+    setInputCode(landCode);
 
     try {
       const result = await loadParcelData(landCode, token);
