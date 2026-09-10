@@ -14,9 +14,10 @@ router = APIRouter(prefix="/api/v1", tags=["Chat"])
 class ChatRequest(BaseModel):
     query: str
     land_code: Optional[str] = None
+    lang: Optional[str] = "hi"
 
 
-@router.post("/chat", summary="Converse with the Hinglish Bhoomi Mitra AI voice agent")
+@router.post("/chat", summary="Converse with the multilingual Bhoomi Mitra AI voice agent")
 async def chat(
     body: ChatRequest,
     _user: dict = Depends(get_current_user),
@@ -24,5 +25,5 @@ async def chat(
     if not body.query.strip():
         raise HTTPException(status_code=400, detail="Query must not be empty.")
 
-    response_text = await get_llm_response(body.query, body.land_code)
+    response_text = await get_llm_response(body.query, body.land_code, body.lang or "hi")
     return {"response_text": response_text}

@@ -418,7 +418,7 @@ export default function ChatBot({ onMapAction, onDocAction, activePlotCode, parc
     try {
       let botReply = '';
       try {
-        const data = await chatWithAgent(text, activePlotCode, token);
+        const data = await chatWithAgent(text, activePlotCode, token, userLang);
         botReply = data.response_text || data.reply || '';
         botReply = parseActionTags(botReply, onMapAction, onDocAction);
       } catch (_) {}
