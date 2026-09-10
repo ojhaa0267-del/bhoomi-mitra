@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhoomi Mitra — Interactive Land Map</title>
+    <meta name="description" content="AI-powered interactive land parcel risk map for Indian citizens. Zero API keys required.">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════
+           RESET & GLOBAL
+        ═══════════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-deep:    #070F1E;
+            --bg-card:    #111E36;
+            --bg-surface: #0D1729;
+            --border:     #1E293B;
+            --text:       #E2E8F0;
+            --text-dim:   #94A3B8;
+            --accent:     #3B82F6;
+            --emerald:    #10B981;
+            --amber:      #F59E0B;
+            --crimson:    #EF4444;
+            --radius:     16px;
+            --font-body:  'Inter', system-ui, sans-serif;
+            --font-display: 'Outfit', 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg-deep);
+            color: var(--text);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ═══════════════════════════════════════════
+           HEADER
+        ═══════════════════════════════════════════ */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 28px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(7, 15, 30, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #6366F1);
+            display: grid;
+            place-items: center;
+            font-size: 18px;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .logo-text {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 20px;
+            background: linear-gradient(135deg, #fff 30%, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* ═══════════════════════════════════════════
+           MAIN LAYOUT
+        ═══════════════════════════════════════════ */
+        .main {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            height: calc(100vh - 69px);
+        }
+
+        @media (max-width: 860px) {
+            .main {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+            .sidebar { max-height: 45vh; overflow-y: auto; }
+        }
+
+        /* ═══════════════════════════════════════════
+           SIDEBAR
+        ═══════════════════════════════════════════ */
+        .sidebar {
+            border-right: 1px solid var(--border);
+            background: var(--bg-surface);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* Search Bar */
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .search-box input::placeholder { color: var(--text-dim); }
+
+        .search-box .icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: var(--text-dim);
+            pointer-events: none;
+        }
+
+        /* Section Titles */
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--text-dim);
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Parcel Cards */
+        .parcel-card {
+            padding: 16px;
+            border-radius: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .parcel-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 4px;
+            height: 100%;
+            border-radius: 14px 0 0 14px;
+            transition: width 0.3s;
+        }
+
+        .parcel-card.risk-low::before    { background: var(--emerald); }
+        .parcel-card.risk-medium::before { background: var(--amber); }
+        .parcel-card.risk-high::before   { background: var(--crimson); }
+
+        .parcel-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .parcel-card:hover::before { width: 6px; }
+
+        .parcel-card.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25), 0 8px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .card-owner {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .risk-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .risk-badge.low    { background: rgba(16, 185, 129, 0.15); color: var(--emerald); }
+        .risk-badge.medium { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+        .risk-badge.high   { background: rgba(239, 68, 68, 0.15); color: var(--crimson); }
+
+        .card-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .meta-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .meta-row .label { min-width: 70px; font-weight: 500; }
+        .meta-row .value { color: var(--text); font-weight: 500; }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        /* ═══════════════════════════════════════════
+           MAP CONTAINER
+        ═══════════════════════════════════════════ */
+        .map-wrapper {
+            position: relative;
+            overflow: hidden;
+            min-height: 500px;
+            height: 100%;
+        }
+
+        #map {
+            height: 100%;
+            min-height: 500px;
+            width: 100%;
+            /* 💡 Dark mode CSS trick — inverts OSM tiles into a beautiful dark theme */
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+
+        /* Override Leaflet popup to match dark theme */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-card) !important;
+            color: var(--text) !important;
+            border: 1px solid var(--accent) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+            /* Reverse the parent invert so popup renders correctly */
+            filter: invert(100%) hue-rotate(180deg) brightness(105%) contrast(110%);
+            padding: 4px !important;
+        }
+
+        .leaflet-popup-tip {
+            background: var(--bg-card) !important;
+            filter: invert(100%) hue-rotate(180deg) brightness(105%) contrast(110%);
+        }
+
+        .leaflet-popup-close-button {
+            color: #94A3B8 !important;
+            font-size: 20px !important;
+            filter: invert(100%) hue-rotate(180deg);
+        }
+
+        /* Map overlay info */
+        .map-overlay {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 800;
+            padding: 10px 16px;
+            border-radius: 12px;
+            background: rgba(17, 30, 54, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            /* Reverse the parent filter */
+            filter: invert(100%) hue-rotate(180deg) brightness(105%) contrast(110%);
+        }
+
+        .map-overlay .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--emerald);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+            50%      { opacity: 0.7; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        }
+
+        /* Coordinate display */
+        .coord-display {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            z-index: 800;
+            padding: 8px 14px;
+            border-radius: 10px;
+            background: rgba(17, 30, 54, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            font-size: 11px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--text-dim);
+            filter: invert(100%) hue-rotate(180deg) brightness(105%) contrast(110%);
+        }
+
+        /* ═══════════════════════════════════════════
+           POPUP CONTENT STYLING
+        ═══════════════════════════════════════════ */
+        .popup-inner {
+            font-family: 'Inter', sans-serif;
+            min-width: 220px;
+            padding: 6px;
+        }
+
+        .popup-inner .popup-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .popup-inner .popup-risk {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .popup-inner .risk-l { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+        .popup-inner .risk-m { background: rgba(245, 158, 11, 0.2); color: #F59E0B; }
+        .popup-inner .risk-h { background: rgba(239, 68, 68, 0.2); color: #EF4444; }
+
+        .popup-inner .popup-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .popup-inner .popup-row:last-of-type { border-bottom: none; }
+        .popup-inner .popup-label { color: #94A3B8; }
+        .popup-inner .popup-value { color: #E2E8F0; font-weight: 600; }
+
+        .popup-inner .popup-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+            padding: 7px 14px;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.15);
+            color: #3B82F6;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.2s;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .popup-inner .popup-link:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+
+        /* ═══════════════════════════════════════════
+           POLYGON GLOW ANIMATION (via SVG)
+        ═══════════════════════════════════════════ */
+        @keyframes borderPulse {
+            0%, 100% { stroke-opacity: 1; }
+            50%      { stroke-opacity: 0.4; }
+        }
+
+        .leaflet-interactive { transition: fill-opacity 0.3s, stroke-width 0.3s; }
+        .leaflet-interactive:hover { fill-opacity: 0.55 !important; stroke-width: 4 !important; }
+
+        /* ═══════════════════════════════════════════
+           SCROLLBAR
+        ═══════════════════════════════════════════ */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+    <!-- ═══ HEADER ═══ -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">🌍</div>
+            <span class="logo-text">Bhoomi Mitra</span>
+        </div>
+        <span class="badge">Interactive Map — No API Key</span>
+    </header>
+
+    <!-- ═══ MAIN LAYOUT ═══ -->
+    <main class="main">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Search -->
+            <div class="search-box">
+                <span class="icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Search ULPIN / Khasra No..." />
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:#10B981"></div> Safe</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#F59E0B"></div> Caution</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#EF4444"></div> High Risk</div>
+            </div>
+
+            <div class="section-title">📋 Land Parcels (3 Demo)</div>
+
+            <!-- Cards rendered by JS -->
+            <div id="cardContainer"></div>
+        </aside>
+
+        <!-- MAP -->
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <div class="map-overlay">
+                <div class="dot"></div>
+                <span>Live — OpenStreetMap (Free)</span>
+            </div>
+            <div class="coord-display" id="coordDisplay">Lat: —  Lng: —</div>
+        </div>
+
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+    /* ═══════════════════════════════════════════════════
+       DATA — 3 DEMO PARCELS (matches backend mock)
+    ═══════════════════════════════════════════════════ */
+    const PARCELS = [
+        {
+            id: '14029857364199',
+            owner: 'Ramesh Chandra Verma',
+            khasra: '142/1A',
+            village: 'Saharanpur, UP',
+            area: '2.5 Bigha',
+            lat: 29.9680,
+            lng: 77.5500,
+            risk: 'Low',
+            trustScore: 92,
+            circleRate: '₹1,800/sqm',
+            encumbrances: 'None'
+        },
+        {
+            id: '14029857364102',
+            owner: 'Priya Devi Sharma',
+            khasra: '87/3B',
+            village: 'Meerut, UP',
+            area: '1.8 Bigha',
+            lat: 28.9845,
+            lng: 77.7064,
+            risk: 'Medium',
+            trustScore: 58,
+            circleRate: '₹3,200/sqm',
+            encumbrances: 'Bank Mortgage (SBI)'
+        },
+        {
+            id: '14029857364200',
+            owner: 'Abdul Karim Khan',
+            khasra: '203/7C',
+            village: 'Lucknow, UP',
+            area: '3.1 Bigha',
+            lat: 26.8467,
+            lng: 80.9462,
+            risk: 'High',
+            trustScore: 24,
+            circleRate: '₹5,500/sqm',
+            encumbrances: 'Court Stay + Disputed'
+        }
+    ];
+
+    /* ═══════════════════════════════════════════════════
+       COLOR MAP
+    ═══════════════════════════════════════════════════ */
+    const RISK_COLORS = {
+        Low:    '#10B981',
+        Medium: '#F59E0B',
+        High:   '#EF4444'
+    };
+
+    const RISK_EMOJI = {
+        Low:    '✅',
+        Medium: '⚠️',
+        High:   '🚨'
+    };
+
+    /* ═══════════════════════════════════════════════════
+       INITIALIZE LEAFLET MAP
+    ═══════════════════════════════════════════════════ */
+    const map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+    }).setView([27.5, 79.5], 7); // Overview of UP
+
+    // Zoom control in top-left
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    // Attribution bottom-right
+    L.control.attribution({ position: 'bottomright', prefix: false })
+        .addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" style="color:#3B82F6">OpenStreetMap</a>')
+        .addTo(map);
+
+    // Free OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+    }).addTo(map);
+
+    // Track cursor coordinates
+    map.on('mousemove', function (e) {
+        document.getElementById('coordDisplay').textContent =
+            `Lat: ${e.latlng.lat.toFixed(5)}  Lng: ${e.latlng.lng.toFixed(5)}`;
+    });
+
+    /* ═══════════════════════════════════════════════════
+       DRAW POLYGONS & MARKERS
+    ═══════════════════════════════════════════════════ */
+    const polygonLayers = {};
+
+    PARCELS.forEach(p => {
+        const color = RISK_COLORS[p.risk];
+        const offset = 0.0012; // ~130m square plot
+
+        const bounds = [
+            [p.lat - offset, p.lng - offset],
+            [p.lat - offset, p.lng + offset],
+            [p.lat + offset, p.lng + offset],
+            [p.lat + offset, p.lng - offset]
+        ];
+
+        const riskClass = p.risk === 'Low' ? 'risk-l' : p.risk === 'Medium' ? 'risk-m' : 'risk-h';
+
+        const polygon = L.polygon(bounds, {
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.3,
+            weight: 3,
+            dashArray: p.risk === 'High' ? '8 4' : null
+        }).addTo(map);
+
+        const popupHTML = `
+            <div class="popup-inner">
+                <div class="popup-title">
+                    ${RISK_EMOJI[p.risk]}
+                    <span>${p.owner}</span>
+                    <span class="popup-risk ${riskClass}">${p.risk} Risk</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">ULPIN</span>
+                    <span class="popup-value">${p.id}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Khasra</span>
+                    <span class="popup-value">${p.khasra}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Area</span>
+                    <span class="popup-value">${p.area}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Village</span>
+                    <span class="popup-value">${p.village}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Circle Rate</span>
+                    <span class="popup-value">${p.circleRate}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Trust Score</span>
+                    <span class="popup-value" style="color:${color}">${p.trustScore}/100</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Encumbrance</span>
+                    <span class="popup-value">${p.encumbrances}</span>
+                </div>
+                <a class="popup-link"
+                   href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}"
+                   target="_blank">
+                    📍 Open in Google Maps
+                </a>
+            </div>
+        `;
+
+        polygon.bindPopup(popupHTML, { maxWidth: 300, closeButton: true });
+        polygonLayers[p.id] = polygon;
+    });
+
+    /* ═══════════════════════════════════════════════════
+       RENDER SIDEBAR CARDS
+    ═══════════════════════════════════════════════════ */
+    const cardContainer = document.getElementById('cardContainer');
+
+    function renderCards(filter = '') {
+        cardContainer.innerHTML = '';
+        const filtered = PARCELS.filter(p =>
+            p.id.includes(filter) ||
+            p.owner.toLowerCase().includes(filter.toLowerCase()) ||
+            p.khasra.toLowerCase().includes(filter.toLowerCase()) ||
+            p.village.toLowerCase().includes(filter.toLowerCase())
+        );
+
+        if (filtered.length === 0) {
+            cardContainer.innerHTML = `<p style="text-align:center;color:var(--text-dim);font-size:13px;padding:20px;">No parcels found.</p>`;
+            return;
+        }
+
+        filtered.forEach(p => {
+            const riskLower = p.risk.toLowerCase();
+            const card = document.createElement('div');
+            card.className = `parcel-card risk-${riskLower}`;
+            card.dataset.id = p.id;
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <span class="card-owner">${RISK_EMOJI[p.risk]} ${p.owner}</span>
+                    <span class="risk-badge ${riskLower}">${p.risk}</span>
+                </div>
+                <div class="card-meta">
+                    <div class="meta-row">
+                        <span class="label">ULPIN</span>
+                        <span class="value">${p.id}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="label">Khasra</span>
+                        <span class="value">${p.khasra}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="label">Village</span>
+                        <span class="value">${p.village}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="label">Area</span>
+                        <span class="value">${p.area}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="label">Trust</span>
+                        <span class="value" style="color:${RISK_COLORS[p.risk]}">${p.trustScore}/100</span>
+                    </div>
+                </div>
+            `;
+
+            // Click to fly to the parcel on the map
+            card.addEventListener('click', () => {
+                // Remove active state from all cards
+                document.querySelectorAll('.parcel-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+
+                // Fly to the parcel and open its popup
+                map.flyTo([p.lat, p.lng], 16, { duration: 1.2 });
+                setTimeout(() => {
+                    polygonLayers[p.id].openPopup();
+                }, 1300);
+            });
+
+            cardContainer.appendChild(card);
+        });
+    }
+
+    renderCards();
+
+    /* ═══════════════════════════════════════════════════
+       SEARCH INPUT
+    ═══════════════════════════════════════════════════ */
+    document.getElementById('searchInput').addEventListener('input', function () {
+        renderCards(this.value.trim());
+    });
+
+    /* ═══════════════════════════════════════════════════
+       KEYBOARD SHORTCUT: Press 1/2/3 to jump to parcels
+    ═══════════════════════════════════════════════════ */
+    document.addEventListener('keydown', (e) => {
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < PARCELS.length && !e.ctrlKey && !e.altKey) {
+            const cards = document.querySelectorAll('.parcel-card');
+            if (cards[idx]) cards[idx].click();
+        }
+    });
+    </script>
+
+</body>
+</html>
