@@ -24,6 +24,7 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { API_BASE_URL } from '../config';
+import { searchVicinity, getAdjacentPlots } from '../utils/api';
 
 // ── Fallback & Kolkata Defaults ──────────────────────────────────────────
 const DEFAULT_USER_LOCATION = {
@@ -262,8 +263,7 @@ const LandMap = forwardRef(function LandMap(
   // Fetch Adjacent Plots on Mount
   useEffect(() => {
     if (!bhuAadharId) return;
-    fetch(`${API_BASE_URL}/api/v1/land/${bhuAadharId}/adjacent`)
-      .then(res => res.json())
+    getAdjacentPlots(bhuAadharId, null)
       .then(data => {
         if (data.adjacent_count > 0) {
           setAdjacentPlots(data.adjacent_plots);
@@ -707,18 +707,13 @@ const LandMap = forwardRef(function LandMap(
                 <button
                   onClick={() => {
                     setIsFetchingVicinity(true);
-                    fetch(`${API_BASE_URL}/api/v1/spatial/vicinity-search`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
+                    searchVicinity({
                         center_lat: (selectedAreaBounds.minLat + selectedAreaBounds.maxLat) / 2,
                         center_lng: (selectedAreaBounds.minLng + selectedAreaBounds.maxLng) / 2,
                         radius_km: 1.5,
                         area_sqm: selectedAreaBounds.areaSqm,
                         plot_type: selectedAreaBounds.plotType
-                      })
-                    })
-                    .then(res => res.json())
+                    }, null)
                     .then(data => {
                       setVicinityData(data);
                       if (onSimulateSearch && data.target_location_profile) {

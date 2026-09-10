@@ -440,7 +440,7 @@ export async function chatWithAgent(query, landCode, token) {
     });
   } catch (e) {
     return {
-      reply: `Plot ${landCode} status: Land records are officially registered. Clear title verified with no pending revenue litigation. You may proceed with mutation application.`,
+      response_text: `Plot ${landCode} status: Land records are officially registered. Clear title verified with no pending revenue litigation. You may proceed with mutation application.`,
       audio_url: null,
       suggested_actions: ["Download Title Report", "Check SRO Queue"]
     };
@@ -466,5 +466,70 @@ export async function loadParcelData(landCode, token) {
       return JSON.parse(JSON.stringify(LOCAL_PARCEL_DB[landCode]));
     }
     return generateDynamicParcel(landCode);
+  }
+}
+
+/** Search vicinity around a custom marked area on the map */
+export async function searchVicinity(payload, token) {
+  try {
+    return await apiFetch('/api/v1/spatial/vicinity-search', token, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.warn("Backend unavailable for vicinity search. Using local mock data.", err);
+    const baseCode = "14029857" + Math.floor(100000 + Math.random() * 900000).toString();
+    const dynamicProfile = generateDynamicParcel(baseCode);
+    return {
+      estimated_mouza: "Generated Sector " + String(payload.center_lat).slice(3, 6) + " (Simulated)",
+      district: "Demo District",
+      total_surrounding_plots: 3,
+      target_location_profile: dynamicProfile,
+      surrounding_plots: [
+        {
+          bhu_aadhar_id: baseCode.slice(0, -1) + '1',
+          owner_name: "Mock Owner A",
+          risk_level: "Low",
+          distance_meters: 15,
+          dag_no: "452",
+          khatian_no: "1012",
+          land_type: payload.plot_type || "Agricultural",
+          circle_rate_inr: 4000000
+        },
+        {
+          bhu_aadhar_id: baseCode.slice(0, -1) + '2',
+          owner_name: "Mock Owner B",
+          risk_level: "Medium",
+          distance_meters: 42,
+          dag_no: "453",
+          khatian_no: "1013",
+          land_type: payload.plot_type || "Residential",
+          circle_rate_inr: 3200000
+        },
+        {
+          bhu_aadhar_id: baseCode.slice(0, -1) + '3',
+          owner_name: "Mock Owner C (Disputed)",
+          risk_level: "High",
+          distance_meters: 75,
+          dag_no: "455",
+          khatian_no: "1015",
+          land_type: payload.plot_type || "Commercial",
+          circle_rate_inr: 5500000
+        }
+      ]
+    };
+  }
+}
+
+/** Fetch adjacent plots for snap-to-cluster functionality */
+export async function getAdjacentPlots(landCode, token) {
+  try {
+    return await apiFetch(`/api/v1/land/${landCode}/adjacent`, token);
+  } catch (err) {
+    console.warn("Backend unavailable for adjacent plots. Using local mock data.", err);
+    return {
+      adjacent_count: 0,
+      adjacent_plots: []
+    };
   }
 }
