@@ -250,18 +250,22 @@ if (typeof window !== 'undefined' && window.speechSynthesis) {
 
 // ── TTS Helper ────────────────────────────────────────────────────────────
 let currentAudio = null;
+let currentFetchController = null;
 
 function speak(text, lang = 'hi-IN') {
   if (!text) return;
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   if (window.speechSynthesis) window.speechSynthesis.cancel();
+  if (currentFetchController) { currentFetchController.abort(); currentFetchController = null; }
 
   const cleanText = text.replace(/[🌾🔷📜✅⚠️🔴🏗️⚖️📍🗺️🎯💡📋🙏💰🌱👤]/g, '').replace(/\*\*/g, '').replace(/\n+/g, '. ').trim();
   if (!cleanText) return;
 
   // ElevenLabs TTS (Primary)
   const apiKey = 'ee30412b2bc01b2ef16c1f3ccde8db419e4551bd124fe0c77b38c62b552e9dff';
-  const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam - Good multilingual voice
+  const voiceId = '9BWtsMINqrJLrRacOk9x'; // Aria - Very natural and highly expressive multilingual voice
+  
+  currentFetchController = new AbortController();
   
   fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: 'POST',
@@ -272,8 +276,9 @@ function speak(text, lang = 'hi-IN') {
     body: JSON.stringify({
       text: cleanText,
       model_id: 'eleven_multilingual_v2',
-      voice_settings: { stability: 0.5, similarity_boost: 0.5 }
-    })
+      voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+    }),
+    signal: currentFetchController.signal
   })
   .then(res => {
     if (!res.ok) throw new Error('ElevenLabs API failed');
@@ -285,6 +290,7 @@ function speak(text, lang = 'hi-IN') {
     currentAudio.play();
   })
   .catch(err => {
+    if (err.name === 'AbortError') return; // Ignored if aborted by new TTS call
     console.warn("ElevenLabs failed, falling back to browser TTS:", err);
     
     // Fallback to Browser Speech Synthesis
@@ -473,16 +479,34 @@ export default function ChatBot({ onMapAction, onDocAction, activePlotCode, parc
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { alert('Browser voice support nahi karta. Chrome/Edge use karein.'); return; }
     if (isListening) { recogRef.current?.stop(); setIsListening(false); return; }
-    const recog = new SR();
-    recog.lang = `${userLang}-IN`;
-    recog.interimResults = false;
-    recog.maxAlternatives = 1;
-    recog.onstart = () => setIsListening(true);
-    recog.onend = () => setIsListening(false);
-    recog.onerror = () => setIsListening(false);
-    recog.onresult = (e) => { const t = e.results[0][0].transcript; setInputQuery(t); setTimeout(() => handleSend(t), 300); };
-    recogRef.current = recog;
-    recog.start();
+    
+    try {
+      const recog = new SR();
+      try { recog.lang = `${userLang}-IN`; } catch(e) { recog.lang = 'hi-IN'; }
+      recog.interimResults = false;
+      recog.maxAlternatives = 1;
+      
+      recog.onstart = () => setIsListening(true);
+      recog.onend = () => setIsListening(false);
+      recog.onerror = (e) => { 
+        console.warn("STT Error:", e.error); 
+        setIsListening(false);
+        if (e.error === 'not-allowed') alert('Please allow microphone access to use voice chat.');
+      };
+      recog.onresult = (e) => { 
+        if (e.results && e.results[0] && e.results[0][0]) {
+          const t = e.results[0][0].transcript;
+          setInputQuery(t);
+          setTimeout(() => handleSend(t), 300);
+        }
+      };
+      
+      recogRef.current = recog;
+      recog.start();
+    } catch (err) {
+      console.error("STT Init Error:", err);
+      setIsListening(false);
+    }
   }, [isListening, userLang, handleSend]);
 
   const chips = getLang(userLang).chips;
