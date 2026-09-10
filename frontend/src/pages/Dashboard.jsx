@@ -357,6 +357,7 @@ export default function Dashboard() {
         onMapAction={handleMapAction}
         onDocAction={handleDocAction}
         activePlotCode={activeCode}
+        parcelData={data}
         userLang={userLang}
       />
 

@@ -433,18 +433,11 @@ export async function computeDistance(originCode, destCode, token) {
 
 /** Chat with Bhoomi Mitra AI voice agent */
 export async function chatWithAgent(query, landCode, token) {
-  try {
-    return await apiFetch('/api/v1/chat', token, {
-      method: 'POST',
-      body: JSON.stringify({ query, land_code: landCode }),
-    });
-  } catch (e) {
-    return {
-      response_text: `Plot ${landCode} status: Land records are officially registered. Clear title verified with no pending revenue litigation. You may proceed with mutation application.`,
-      audio_url: null,
-      suggested_actions: ["Download Title Report", "Check SRO Queue"]
-    };
-  }
+  // Try the backend. If it fails, throw so ChatBot's local AI engine takes over.
+  return await apiFetch('/api/v1/chat', token, {
+    method: 'POST',
+    body: JSON.stringify({ query, land_code: landCode }),
+  });
 }
 
 /**
