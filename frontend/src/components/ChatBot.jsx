@@ -257,23 +257,54 @@ function speak(text, lang = 'hi-IN') {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
 
   const cleanText = text.replace(/[🌾🔷📜✅⚠️🔴🏗️⚖️📍🗺️🎯💡📋🙏💰🌱👤]/g, '').replace(/\*\*/g, '').replace(/\n+/g, '. ').trim();
-  if (!cleanText || !window.speechSynthesis) return;
+  if (!cleanText) return;
 
-  const utter = new SpeechSynthesisUtterance(cleanText);
-  utter.rate = 0.95; utter.pitch = 1.0; utter.volume = 1.0;
+  // ElevenLabs TTS (Primary)
+  const apiKey = 'ee30412b2bc01b2ef16c1f3ccde8db419e4551bd124fe0c77b38c62b552e9dff';
+  const voiceId = 'pNInz6obpgDQGcFmaJgB'; // Adam - Good multilingual voice
+  
+  fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      text: cleanText,
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: { stability: 0.5, similarity_boost: 0.5 }
+    })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('ElevenLabs API failed');
+    return res.blob();
+  })
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    currentAudio = new Audio(url);
+    currentAudio.play();
+  })
+  .catch(err => {
+    console.warn("ElevenLabs failed, falling back to browser TTS:", err);
+    
+    // Fallback to Browser Speech Synthesis
+    if (!window.speechSynthesis) return;
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    utter.rate = 0.95; utter.pitch = 1.0; utter.volume = 1.0;
 
-  const voices = window.speechSynthesis.getVoices();
-  const langPrefix = lang.split('-')[0];
-  const preferredVoice =
-    voices.find(v => v.name.includes('Google') && v.lang.startsWith(langPrefix)) ||
-    voices.find(v => v.lang.startsWith(langPrefix) && !v.name.includes('Compact')) ||
-    voices.find(v => v.lang.startsWith(langPrefix)) ||
-    voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
-    voices.find(v => v.lang === 'en-IN') ||
-    voices.find(v => v.lang.startsWith('en'));
-  if (preferredVoice) utter.voice = preferredVoice;
-  utter.lang = lang;
-  window.speechSynthesis.speak(utter);
+    const voices = window.speechSynthesis.getVoices();
+    const langPrefix = lang.split('-')[0];
+    const preferredVoice =
+      voices.find(v => v.name.includes('Google') && v.lang.startsWith(langPrefix)) ||
+      voices.find(v => v.lang.startsWith(langPrefix) && !v.name.includes('Compact')) ||
+      voices.find(v => v.lang.startsWith(langPrefix)) ||
+      voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
+      voices.find(v => v.lang === 'en-IN') ||
+      voices.find(v => v.lang.startsWith('en'));
+    if (preferredVoice) utter.voice = preferredVoice;
+    utter.lang = lang;
+    window.speechSynthesis.speak(utter);
+  });
 }
 
 // ── LOCAL AI ENGINE ───────────────────────────────────────────────────────
